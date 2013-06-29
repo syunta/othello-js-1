@@ -208,13 +208,16 @@
   };
 
   function findTheBestMoveByAI(gameTree, playerType) {
+    window.total = 0;
+    window.cut = 0;
     var ai = aiTable[playerType];
     var ratings = calculateMaxRatings(
       limitGameTreeDepth(gameTree, ai.level),
       gameTree.player,
       Number.MIN_VALUE,
       Number.MAX_VALUE,
-      ai.scoreBoard
+      ai.scoreBoard,
+      false
     );
     var maxRating = Math.max.apply(null, ratings);
     return gameTree.moves[ratings.indexOf(maxRating)];
@@ -255,7 +258,7 @@
     });
   }
 
-  function ratePositionWithAlphaBetaPruning(gameTree, player, lowerLimit, upperLimit, scoreBoard) {
+  function ratePositionWithAlphaBetaPruning(gameTree, player, lowerLimit, upperLimit, scoreBoard, wasCut) {
     if (1 <= gameTree.moves.length) {
       var judge =
         gameTree.player == player
@@ -265,45 +268,52 @@
         gameTree.player == player
         ? calculateMaxRatings
         : calculateMinRatings;
-      return judge.apply(null, rate(gameTree, player, lowerLimit, upperLimit, scoreBoard));
+      return judge.apply(null, rate(gameTree, player, lowerLimit, upperLimit, scoreBoard, wasCut));
     } else {
+      window.total++;
+      if (wasCut)
+        window.cut++;
       return scoreBoard(gameTree.board, player);
     }
   }
 
-  function calculateMaxRatings(gameTree, player, lowerLimit, upperLimit, scoreBoard) {
+  function calculateMaxRatings(gameTree, player, lowerLimit, upperLimit, scoreBoard, wasCut) {
     var ratings = [];
     var newLowerLimit = lowerLimit;
+    var isCut = wasCut;
     for (var i = 0; i < gameTree.moves.length; i++) {
       var r = ratePositionWithAlphaBetaPruning(
         force(gameTree.moves[i].gameTreePromise),
         player,
         newLowerLimit,
         upperLimit,
-        scoreBoard
+        scoreBoard,
+        isCut
       );
       ratings.push(r);
       if (upperLimit <= r)
-        break;
+        isCut = true;
       newLowerLimit = Math.max(r, newLowerLimit);
     }
     return ratings;
   }
 
-  function calculateMinRatings(gameTree, player, lowerLimit, upperLimit, scoreBoard) {
+  function calculateMinRatings(gameTree, player, lowerLimit, upperLimit, scoreBoard, wasCut) {
     var ratings = [];
     var newUpperLimit = upperLimit;
+    var isCut = wasCut;
     for (var i = 0; i < gameTree.moves.length; i++) {
       var r = ratePositionWithAlphaBetaPruning(
         force(gameTree.moves[i].gameTreePromise),
         player,
         upperLimit,
         newUpperLimit,
-        scoreBoard
+        scoreBoard,
+        isCut
       );
       ratings.push(r);
       if (r <= lowerLimit)
-        break;
+        isCut = true;
       newUpperLimit = Math.min(r, newUpperLimit);
     }
     return ratings;
